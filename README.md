@@ -43,9 +43,11 @@ You can interact with each of these, discovering their current price, how much y
 
 ### Portfolio
 You will also have access to the aggregate portfolio value (`portfolio.current_value`) and its allocation among the different positions (`portfolio.allocation`). And as you do with each position you will have a chance to plot the Profit/Loss (`portfolio.plot_profit_loss()`) 
+
 ![](images/plot_profit.png)
 
 and its Value graph (`portfolio.plot_value()`).
+
 ![](images/plot_value.png)
 
 # Caveats
