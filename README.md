@@ -32,10 +32,18 @@ Out[3]:
 [Position(MSFT),
  Position(AAPL)]
 ```
-You can interact with each of these, discovering their current price, how much you have invested in them and how many shares you own. Most importantly you can plot the Profit/Loss (`position.plot_profit_loss()`) and their Value graph (`position.plot_value()`).
+You can interact with each of these, discovering their current price, how much you have invested in them and how many shares you own. Most importantly you can plot the Profit/Loss (`position.plot_profit_loss()`) ...
+![](./aapl_profit.png)
+
+...and their Value graph (`position.plot_value()`).
+![](./aapl.png)
 
 ### Portfolio
-You will also have access to the aggregate portfolio value (`portfolio.current_value`) and its allocation among the different positions (`portfolio.allocation`). And as you do with each position you will have a chance to plot the Profit/Loss (`portfolio.plot_profit_loss()`) and its Value graph (`portfolio.plot_value()`).
+You will also have access to the aggregate portfolio value (`portfolio.current_value`) and its allocation among the different positions (`portfolio.allocation`). And as you do with each position you will have a chance to plot the Profit/Loss (`portfolio.plot_profit_loss()`) 
+![](./plot_profit.png)
+
+and its Value graph (`portfolio.plot_value()`).
+![](./plot_value.png)
 
 # Caveats
  * This was a quick exercise and besides a bit of caching I have not added anything fancy
