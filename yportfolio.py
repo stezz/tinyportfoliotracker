@@ -37,12 +37,12 @@ class Position:
         self.ticker = ticker
         self.prices = self._load_prices()
         self._populate()
-        self.current_value = self.df['Current Value'].iloc[-1]
-        self.invested_balance = self.df["Invested Balance"].iloc[-1]
-        self.profit = self.df['Profit/Loss'].iloc[-1]
-        self.profit_percentage = self.df['Profit/Loss (%)'].iloc[-1]
+        self.current_value = round(self.df['Current Value'].iloc[-1], 2)
+        self.invested_balance = round(self.df["Invested Balance"].iloc[-1], 2)
+        self.profit = round(self.df['Profit/Loss'].iloc[-1], 2)
+        self.profit_percentage = round(self.df['Profit/Loss (%)'].iloc[-1] ,2)
         self.shares_owned = self.df["Owned"].iloc[-1]
-        self.current_price = self.prices.iloc[-1]
+        self.current_price = round(self.prices.iloc[-1], 2)
         #self.avg_purchase_price = self.df["Invested Balance"].iloc[-1]/self.df["Owned"].iloc[-1]
 
     def _load_prices(self):
@@ -50,10 +50,8 @@ class Position:
         cache = Cache(self.ticker + ".pkl")
         cached_prices = cache.load()
         if cache.found:
-            print('cache found')
             start_date = cache.end_date() + dt.timedelta(days=1)
         else:
-            print('cache not found')
             start_date = self.df.index[0]
         new_data = False
         if dt.datetime.today() > start_date:
@@ -85,7 +83,6 @@ class Position:
         self.df["Purchase Price"].fillna(0, inplace=True)
         self.df.ffill(inplace=True)
         # --------------------------------------------------- #
-        print(self.df['Owned'].shape)
         self.df['Current Value'] = self.df['Owned'] * self.prices
         self.df['Profit/Loss'] = self.df['Current Value'] - self.df["Invested Balance"]
         self.df['Profit/Loss (%)'] = (self.df['Current Value']/self.df["Invested Balance"] - 1) * 100
@@ -118,6 +115,12 @@ class Portfolio:
         self.positions = positions
         self.df = pd.DataFrame()
         self._populate()
+        self.tickers = [x.ticker for x in self.positions]
+        self.current_value = round(self.df['Current Value'].iloc[-1], 2)
+        self.allocation = self._get_positions_size()
+
+    def __repr__(self):
+        return "Portfolio(%.2f USD)" % self.current_value
         
     def _populate(self):
         for p in self.positions:
@@ -141,6 +144,26 @@ class Portfolio:
         p2 = self.df[['Current Value', 'Invested Balance', 'Profit/Loss']].plot(grid=True, title="Portfolio Value")
         p2.set_ylabel("USD")
         plt.show()
+
+    def rebalance(self, new):
+        # TODO: This takes a new intended allocation and gives the best option to reach it
+        # new is a list of tuples, exactly like self.allocation
+        pass
+
+
+
+
+    def _get_positions_size(self):
+        sizes = []
+        for p in self.positions:
+            share = round(p.current_value / self.current_value * 100, 2)
+            sizes.append((p.ticker, share))
+            # We create a property of the positions itself to remember its size
+            # Note: The position itself can't have a size without being associated to a Portfolio
+            p.size = share
+        sizes.sort(key=lambda x: x[1], reverse=True)
+        return sizes
+
 
 
 class Cache:
