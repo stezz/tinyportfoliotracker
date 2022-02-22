@@ -158,10 +158,10 @@ class Portfolio:
         self.df['Profit/Loss'] = self.df['Current Value'] - self.df['Invested Balance']
         self.df['Profit/Loss (%)'] = (self.df['Current Value'] / self.df['Invested Balance'] - 1) * 100
 
-    def plot_profit_loss(self):
+    def plot_profit_loss(self, benchmark="^NDX"):
         # Plotting Profit/Loss (%)
         p1 = self.df["Profit/Loss (%)"].plot()
-        index = self.load_benchmark()
+        index = self.load_benchmark(benchmark)
         p2 = index.df["Profit/Loss (%)"].plot(ax=p1, grid=True, legend=True, title="Portfolio Profit/Loss (%)")
         p2.set_ylabel('%')
         p2.legend(['Portfolio', index.ticker])
@@ -173,7 +173,7 @@ class Portfolio:
         p2.set_ylabel("USD")
         plt.show()
 
-    def load_benchmark(self, index="^NDX"):
+    def load_benchmark(self, index):
         # Loads a benchmark position
         return Stock(index, self.df.index.min())
 
