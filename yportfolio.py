@@ -30,35 +30,30 @@ class YahooCsv:
 
         return positions
 
-
-class Position:
-    def __init__(self, ticker, df):
-        self.df = df
+class Stock:
+    # Base class for any stock
+    def __init__(self, ticker, start_date):
         self.ticker = ticker
-        self.prices = self._load_prices()
+        self.prices = self._load_prices(start_date)
+        # The only data we have for a stock is its adjusted closed price
+        self.df = pd.concat([self.prices], axis=1)
         self._populate()
-        self.current_value = round(self.df['Current Value'].iloc[-1], 2)
-        self.invested_balance = round(self.df["Invested Balance"].iloc[-1], 2)
-        self.profit = round(self.df['Profit/Loss'].iloc[-1], 2)
-        self.profit_percentage = round(self.df['Profit/Loss (%)'].iloc[-1] ,2)
-        self.shares_owned = self.df["Owned"].iloc[-1]
         self.current_price = round(self.prices.iloc[-1], 2)
-        #self.avg_purchase_price = self.df["Invested Balance"].iloc[-1]/self.df["Owned"].iloc[-1]
+        self.profit = round(self.df['Profit/Loss'].iloc[-1], 2)
 
-    def _load_prices(self):
+    def _load_prices(self, start_date):
         # Check first if we already have some historical prices saved in cache
+        # start_date needs to be a datetime
         cache = Cache(self.ticker + ".pkl")
         cached_prices = cache.load()
-        if cache.found:
+        if cache.found and cache.start_date() < start_date:
             start_date = cache.end_date() + dt.timedelta(days=1)
-        else:
-            start_date = self.df.index[0]
         new_data = False
         if dt.datetime.today() > start_date:
             # Let's avoid making calls to Yahoo if not needed
             new_prices = web.DataReader(self.ticker, "yahoo", start=start_date)["Adj Close"]
             new_data = True
-        if cache.found and new_data:
+        if cache.found and cache.start_date() < start_date and new_data:
             prices = pd.concat([cached_prices, new_prices])
             # Yahoo tends to return at least one value so we need to deduplicate it just in case
             prices = prices[~prices.index.duplicated(keep='first')]
@@ -69,6 +64,43 @@ class Position:
         # dropping dup index rows
         cache.save(prices)
         return prices
+
+    def _populate(self):
+        # A basic stock has only information about prices and
+        self.df['Profit/Loss'] = self.df['Adj Close'] - self.df.iloc[0]['Adj Close']
+        self.df['Profit/Loss (%)'] = (self.df['Profit/Loss'] / self.df.iloc[0]['Adj Close']) * 100
+        # Reindexing over the full year with all the days to take into account for market closed days
+        start_date = self.df.index.min()
+        end_date = self.df.index.max()
+        period = pd.date_range(start_date, end_date)
+        self.df  = self.df.reindex(period, method='ffill')
+
+    def plot_profit_loss(self):
+        # Plotting Profit/Loss (%)
+        p1 = self.df["Profit/Loss (%)"].plot(grid=True, legend=True, title="%s Position Profit/Loss (%%)" % self.ticker)
+        p1.set_ylabel('%')
+        plt.show()
+
+    def __repr__(self):
+        return "Stock(%s)" % self.ticker
+
+
+class Position(Stock):
+    # A Position is a special kind of Stock: one we own
+    # And it takes a list of movements as input
+    def __init__(self, ticker, df):
+        self.df = df
+        self.ticker = ticker
+        self.prices = self._load_prices(self.df.index[0])
+        self._populate()
+        self.current_value = round(self.df['Current Value'].iloc[-1], 2)
+        self.invested_balance = round(self.df["Invested Balance"].iloc[-1], 2)
+        self.profit = round(self.df['Profit/Loss'].iloc[-1], 2)
+        self.profit_percentage = round(self.df['Profit/Loss (%)'].iloc[-1] ,2)
+        self.shares_owned = self.df["Owned"].iloc[-1]
+        self.current_price = round(self.prices.iloc[-1], 2)
+        #self.avg_purchase_price = self.df["Invested Balance"].iloc[-1]/self.df["Owned"].iloc[-1]
+
         
     def _populate(self):
         # calculate the num of shares currently owned
@@ -92,13 +124,6 @@ class Position:
         period = pd.date_range(start_date, end_date)
         self.df  = self.df.reindex(period, method='ffill')
 
-
-
-    def plot_profit_loss(self):
-        # Plotting Profit/Loss (%)
-        p1 = self.df["Profit/Loss (%)"].plot(grid=True, legend=True, title="%s Position Profit/Loss (%%)" % self.ticker)
-        p1.set_ylabel('%')
-        plt.show()
 
     def plot_value(self):
         # Plotting the money value against the invested balance
@@ -135,8 +160,11 @@ class Portfolio:
 
     def plot_profit_loss(self):
         # Plotting Profit/Loss (%)
-        p1 = self.df["Profit/Loss (%)"].plot(grid=True, legend=True, title="Portfolio Profit/Loss (%)")
-        p1.set_ylabel('%')
+        p1 = self.df["Profit/Loss (%)"].plot()
+        index = self.load_benchmark()
+        p2 = index.df["Profit/Loss (%)"].plot(ax=p1, grid=True, legend=True, title="Portfolio Profit/Loss (%)")
+        p2.set_ylabel('%')
+        p2.legend(['Portfolio', index.ticker])
         plt.show()
 
     def plot_value(self):
@@ -144,6 +172,11 @@ class Portfolio:
         p2 = self.df[['Current Value', 'Invested Balance', 'Profit/Loss']].plot(grid=True, title="Portfolio Value")
         p2.set_ylabel("USD")
         plt.show()
+
+    def load_benchmark(self, index="^NDX"):
+        # Loads a benchmark position
+        return Stock(index, self.df.index.min())
+
 
     def rebalance(self, new):
         # TODO: This takes a new intended allocation and gives the best option to reach it
@@ -189,12 +222,12 @@ class Cache:
 
     def end_date(self):
         if self.data.empty:
-            self.data = self.retrieve()
+            self.data = self.load()
         return self.data.index[-1]
 
     def start_date(self):
         if self.data.empty:
-            self.data = self.retrieve()
+            self.data = self.load()
         return self.data.index[0]
 
 
