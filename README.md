@@ -8,6 +8,9 @@ tinyportfoliotracker is not affiliated, endorsed, or vetted by Yahoo, Inc. It's 
 
 You should refer to Yahoo!'s terms of use for details on your rights to use the actual data downloaded.
 
+## Note(2)
+None of the graphs here are coming from real investments, I just made up some test data in a bogus portfolio on Yahoo!Finance ;)
+
 ## Introduction
 TinyPortfolioTracker is a small set of libraries that lets you track your portfolio performance by simply exporting your portfolio that you find [here](https://finance.yahoo.com/portfolio/p_0/view) by clicking on the top right corner "Export" button.
 
@@ -32,7 +35,7 @@ Out[3]:
 [Position(MSFT),
  Position(AAPL)]
 ```
-You can interact with each of these, discovering their current price, how much you have invested in them and how many shares you own. Most importantly you can plot the Profit/Loss (`position.plot_profit_loss()`) ...
+You can interact with each of these, discovering their current price, how much you have invested in them and how many shares you own. Most importantly you can plot the Profit/Loss (`position.plot_profit_loss()`)
 ![](images/aapl_profit.png)
 
 ...and their Value graph (`position.plot_value()`).
@@ -40,9 +43,11 @@ You can interact with each of these, discovering their current price, how much y
 
 ### Portfolio
 You will also have access to the aggregate portfolio value (`portfolio.current_value`) and its allocation among the different positions (`portfolio.allocation`). And as you do with each position you will have a chance to plot the Profit/Loss (`portfolio.plot_profit_loss()`) 
+
 ![](images/plot_profit.png)
 
 and its Value graph (`portfolio.plot_value()`).
+
 ![](images/plot_value.png)
 
 # Caveats
