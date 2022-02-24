@@ -4,6 +4,8 @@ import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from pandas.tseries.offsets import MonthEnd
+
 
 
 class YahooCsv:
@@ -131,6 +133,14 @@ class Position(Stock):
         p2.set_ylabel("USD")
         plt.show()
 
+    def monthly_report(self):
+        # Prints end of month portfolio report
+        end = self.df.index.max()
+        today = self.df.index.min()
+        while today < end - MonthEnd(1):
+            today = today + MonthEnd(1)
+            print(today.date(), "%.2f" % self.df.loc[today]["Profit/Loss (%)"])
+
     def __repr__(self):
         return "Position(%s)" % self.ticker
 
@@ -177,7 +187,6 @@ class Portfolio:
         # Loads a benchmark position
         return Stock(index, self.df.index.min())
 
-
     def rebalance(self, new):
         # TODO: This takes a new intended allocation and gives the best option to reach it
         # new is a list of tuples, exactly like self.allocation
@@ -196,6 +205,14 @@ class Portfolio:
             p.size = share
         sizes.sort(key=lambda x: x[1], reverse=True)
         return sizes
+
+    def monthly_report(self):
+        # Prints end of month portfolio report
+        end = self.df.index.max()
+        today = self.df.index.min()
+        while today < end - MonthEnd(1):
+            today = today + MonthEnd(1)
+            print(today.date(), "%.2f" % self.df.loc[today]["Profit/Loss (%)"])
 
 
 
