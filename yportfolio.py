@@ -110,16 +110,22 @@ class Position(Stock):
         # calculate the invested balance
         self.df["Invested Balance"] = self.df["Purchase Price"] * self.df["Quantity"]
         self.df["Invested Balance"] = self.df["Invested Balance"].cumsum()
+        self.df["Realized Profit/Loss"] = -(self.df["Quantity"] * self.df["Purchase Price"]).\
+            where(self.df["Quantity"] < 0)
+        self.df["Realized Profit/Loss"] = self.df["Realized Profit/Loss"].cumsum()
         # Making sure we have the same index as the historical series of stock prices
         self.df = self.df.reindex(self.prices.index)
         # Filling the reindexed dataframe with the right data #
         self.df["Quantity"].fillna(0, inplace=True)
         self.df["Purchase Price"].fillna(0, inplace=True)
+        self.df["Realized Profit/Loss"].ffill(inplace=True)
+        self.df["Realized Profit/Loss"].fillna(0, inplace=True)
         self.df.ffill(inplace=True)
         # --------------------------------------------------- #
         self.df['Current Value'] = self.df['Owned'] * self.prices
         self.df['Profit/Loss'] = self.df['Current Value'] - self.df["Invested Balance"]
-        self.df['Profit/Loss (%)'] = (self.df['Current Value']/self.df["Invested Balance"] - 1) * 100
+        self.df['Profit/Loss (%)'] = ((self.df["Realized Profit/Loss"] + self.df['Current Value'])/
+                                      (self.df["Realized Profit/Loss"] + self.df["Invested Balance"])- 1) * 100
         # Reindexing over the full year with all the days to take into account for market closed days
         start_date = self.df.index.min()
         end_date = self.df.index.max()
