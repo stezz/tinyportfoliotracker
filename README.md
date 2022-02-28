@@ -30,10 +30,9 @@ portfolio = Portfolio(positions)
 ### Positions
 You will have `positions` which is a simple list containing all your positions, with their historical prices.
 ```python
-In [3]: positions
-Out[3]: 
-[Position(MSFT),
- Position(AAPL)]
+In [6]: positions
+Out[6]: {'AAPL': Position(AAPL), 'GOOG': Position(GOOG), 'MSFT': Position(MSFT)}
+
 ```
 You can interact with each of these, discovering their current price, how much you have invested in them and how many shares you own. Most importantly you can plot the Profit/Loss (`position.plot_profit_loss()`)
 ![](images/aapl_profit.png)
@@ -53,6 +52,19 @@ and its Value graph (`portfolio.plot_value()`).
 and the combined profit/loss graph of all positions (`portfolio.plot_all_positions()`)
 
 ![](images/multiplot.png)
+
+Lastly also a handy function to calculate a monthly report of your portfolio:
+
+```python
+In [7]: portfolio.monthly_report()
+2021-08-31 2.37
+2021-09-30 -5.70
+2021-10-31 7.52
+2021-11-30 8.65
+2021-12-31 12.19
+2022-01-31 6.24
+```
+
 
 # Caveats
  * This was a quick exercise and besides a bit of caching I have not added anything fancy
