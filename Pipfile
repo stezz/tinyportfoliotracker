@@ -7,7 +7,7 @@ name = "pypi"
 pandas = "*"
 pandas-datareader = "*"
 numpy = "*"
-matplotlib = "*"
+plotly = "*"
 
 [dev-packages]
 ipython = "*"

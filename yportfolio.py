@@ -2,9 +2,14 @@ import pandas as pd
 import pandas_datareader as web
 import datetime as dt
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import os
 from pandas.tseries.offsets import MonthEnd
+from plotly.subplots import make_subplots
+import math
+
+pd.options.plotting.backend = "plotly"
+
 
 
 
@@ -24,11 +29,11 @@ class YahooCsv:
         )
         tickers = movements.index.get_level_values("Symbol").unique()
         # Let's slice the multi-index table and build our positions
-        positions = []
+        positions = {}
         for t in tickers:
             p = movements.xs(t)
             p["Symbol"] = t
-            positions.append(Position(t, p))
+            positions[t] = Position(t, p)
 
         return positions
 
@@ -77,11 +82,50 @@ class Stock:
         period = pd.date_range(start_date, end_date)
         self.df  = self.df.reindex(period, method='ffill')
 
+    def _rebase_profits_from(self, start_date):
+        # Recalculate the profits from given date
+        self.df = self.df.loc[start_date:]
+        self._populate()
+
+    @classmethod
+    def plot_this(self, df, labels):
+        # df is a dataframe containing an arbitrary amount of columns
+        # labels is a dict containing title, xaxis label, yaxis label
+        # we use the classmethod decorator so that we can reuse this later.
+        d = []
+        for col in df.columns:
+            d.append(go.Scatter(x=df.index, y=df[col], name=col))
+        fig = go.Figure(data=d)
+        fig.update_layout(
+            title=labels['title'],
+            xaxis_title=labels['xaxis'],
+            yaxis_title=labels['yaxis'],
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list(
+                        [
+                            dict(count=1, label="1m", step="month", stepmode="backward"),
+                            dict(count=6, label="6m", step="month", stepmode="backward"),
+                            dict(count=1, label="YTD", step="year", stepmode="todate"),
+                            dict(count=1, label="1y", step="year", stepmode="backward"),
+                            dict(step="all"),
+                        ]
+                    )
+                ),
+                rangeslider=dict(visible=True),
+                type="date",
+            ),
+        )
+        fig.show()
+
     def plot_profit_loss(self):
         # Plotting Profit/Loss (%)
-        p1 = self.df["Profit/Loss (%)"].plot(grid=True, legend=True, title="%s Position Profit/Loss (%%)" % self.ticker)
-        p1.set_ylabel('%')
-        plt.show()
+        labels = {'title':'%s Profit/Loss (%%)' % self.ticker,
+                  'xaxis': 'Date',
+                  'yaxis': '%'}
+        self.plot_this(pd.DataFrame(self.df["Profit/Loss (%)"]), labels)
+        #p1.set_ylabel('%')
+        #plt.show()
 
     def __repr__(self):
         return "Stock(%s)" % self.ticker
@@ -135,9 +179,10 @@ class Position(Stock):
 
     def plot_value(self):
         # Plotting the money value against the invested balance
-        p2 = self.df[['Current Value', 'Invested Balance', 'Profit/Loss']].plot(grid=True, title="%s Position Value" % self.ticker)
-        p2.set_ylabel("USD")
-        plt.show()
+        labels = {'title':'%s Position Value' % self.ticker,
+                  'xaxis': 'Date',
+                  'yaxis': 'USD'}
+        self.plot_this(self.df[['Current Value', 'Invested Balance', 'Profit/Loss']], labels)
 
     def monthly_report(self):
         # Prints end of month portfolio report
@@ -156,7 +201,7 @@ class Portfolio:
         self.positions = positions
         self.df = pd.DataFrame()
         self._populate()
-        self.tickers = [x.ticker for x in self.positions]
+        self.tickers = [self.positions[x].ticker for x in self.positions.keys()]
         self.current_value = round(self.df['Current Value'].iloc[-1], 2)
         self.allocation = self._get_positions_size()
 
@@ -164,30 +209,54 @@ class Portfolio:
         return "Portfolio(%.2f USD)" % self.current_value
         
     def _populate(self):
-        for p in self.positions:
+        for p in self.positions.keys():
             if not self.df.empty:
-                self.df = self.df.add(p.df[["Invested Balance", "Current Value"]], fill_value=0)
+                self.df = self.df.add(self.positions[p].df[["Invested Balance", "Current Value"]], fill_value=0)
             else:
-                self.df = p.df[["Invested Balance", "Current Value"]]
+                self.df = self.positions[p].df[["Invested Balance", "Current Value"]]
 
         # Calculating Profit/Loss of the whole portfolio day by day
         self.df['Profit/Loss'] = self.df['Current Value'] - self.df['Invested Balance']
         self.df['Profit/Loss (%)'] = (self.df['Current Value'] / self.df['Invested Balance'] - 1) * 100
 
+    def plot_all_positions(self):
+        # Calculating optimal matrix size
+        size = len(self.positions.keys())
+        rows = round(math.sqrt(size))
+        cols = math.ceil(size / rows)
+        # Making subplot matrix
+        fig = make_subplots(rows=rows, cols=cols, start_cell="top-left",
+                            subplot_titles=list(self.positions.keys()))
+        c = 1
+        for p in self.positions.keys():
+            row = math.ceil(c / cols)
+            col = cols if c % cols == 0 else c % cols
+            pos = self.positions[p]
+            fig.add_trace(go.Scatter(x=pos.df.index, y=pos.df['Profit/Loss (%)'],name=pos.ticker),
+                          row=row, col=col)
+            fig.update_yaxes(title_text="%", row=row, col=col)
+            c += 1
+        fig.update_layout(title_text="Profit/Loss (%) of individual positions")
+        fig.show()
+
     def plot_profit_loss(self, benchmark="^NDX"):
         # Plotting Profit/Loss (%)
-        p1 = self.df["Profit/Loss (%)"].plot()
+        p1 = self.df["Profit/Loss (%)"]
         index = self.load_benchmark(benchmark)
-        p2 = index.df["Profit/Loss (%)"].plot(ax=p1, grid=True, legend=True, title="Portfolio Profit/Loss (%)")
-        p2.set_ylabel('%')
-        p2.legend(['Portfolio', index.ticker])
-        plt.show()
+        index._rebase_profits_from(p1.index.min())
+        idx = index.df["Profit/Loss (%)"]
+        t = pd.concat((p1, idx.rename(index.ticker)), axis=1 )
+        labels = {'title':'Portfolio Profit/Loss (%)',
+                  'xaxis': 'Date',
+                  'yaxis': '%'}
+        Stock.plot_this(t, labels)
 
     def plot_value(self):
         # Plotting the money value against the invested balance
-        p2 = self.df[['Current Value', 'Invested Balance', 'Profit/Loss']].plot(grid=True, title="Portfolio Value")
-        p2.set_ylabel("USD")
-        plt.show()
+        labels = {'title':'Portfolio Value',
+                  'xaxis': 'Date',
+                  'yaxis': 'USD'}
+        Stock.plot_this(self.df[['Current Value', 'Invested Balance', 'Profit/Loss']], labels)
 
     def load_benchmark(self, index):
         # Loads a benchmark position
@@ -203,12 +272,12 @@ class Portfolio:
 
     def _get_positions_size(self):
         sizes = []
-        for p in self.positions:
-            share = round(p.current_value / self.current_value * 100, 2)
-            sizes.append((p.ticker, share))
+        for p in self.positions.keys():
+            share = round(self.positions[p].current_value / self.current_value * 100, 2)
+            sizes.append((self.positions[p].ticker, share))
             # We create a property of the positions itself to remember its size
             # Note: The position itself can't have a size without being associated to a Portfolio
-            p.size = share
+            self.positions[p].size = share
         sizes.sort(key=lambda x: x[1], reverse=True)
         return sizes
 
