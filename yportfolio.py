@@ -7,16 +7,14 @@ import os
 from pandas.tseries.offsets import MonthEnd
 from plotly.subplots import make_subplots
 import math
+import argparse
 
 pd.options.plotting.backend = "plotly"
-
-
 
 
 class YahooCsv:
     def __init__(self, input_file):
         self.input_file = input_file
-
 
     def load(self):
         pf = pd.read_csv(self.input_file)
@@ -31,11 +29,13 @@ class YahooCsv:
         # Let's slice the multi-index table and build our positions
         positions = {}
         for t in tickers:
+            print("Loading %s ..." % t)
             p = movements.xs(t)
             p["Symbol"] = t
             positions[t] = Position(t, p)
 
         return positions
+
 
 class Stock:
     # Base class for any stock
@@ -80,7 +80,9 @@ class Stock:
         start_date = self.df.index.min()
         end_date = self.df.index.max()
         period = pd.date_range(start_date, end_date)
-        self.df  = self.df.reindex(period, method='ffill')
+        # sometimes it seems that Yahoo Finance returns duplicated rows... deduplicating here
+        self.df = self.df[~self.df.index.duplicated(keep='first')]
+        self.df = self.df.reindex(period, method='ffill')
 
     def _rebase_profits_from(self, start_date):
         # Recalculate the profits from given date
@@ -120,12 +122,12 @@ class Stock:
 
     def plot_profit_loss(self):
         # Plotting Profit/Loss (%)
-        labels = {'title':'%s Profit/Loss (%%)' % self.ticker,
+        labels = {'title': '%s Profit/Loss (%%)' % self.ticker,
                   'xaxis': 'Date',
                   'yaxis': '%'}
         self.plot_this(pd.DataFrame(self.df["Profit/Loss (%)"]), labels)
-        #p1.set_ylabel('%')
-        #plt.show()
+        # p1.set_ylabel('%')
+        # plt.show()
 
     def __repr__(self):
         return "Stock(%s)" % self.ticker
@@ -142,19 +144,18 @@ class Position(Stock):
         self.current_value = round(self.df['Current Value'].iloc[-1], 2)
         self.invested_balance = round(self.df["Invested Balance"].iloc[-1], 2)
         self.profit = round(self.df['Profit/Loss'].iloc[-1], 2)
-        self.profit_percentage = round(self.df['Profit/Loss (%)'].iloc[-1] ,2)
+        self.profit_percentage = round(self.df['Profit/Loss (%)'].iloc[-1], 2)
         self.shares_owned = self.df["Owned"].iloc[-1]
         self.current_price = round(self.prices.iloc[-1], 2)
-        #self.avg_purchase_price = self.df["Invested Balance"].iloc[-1]/self.df["Owned"].iloc[-1]
+        # self.avg_purchase_price = self.df["Invested Balance"].iloc[-1]/self.df["Owned"].iloc[-1]
 
-        
     def _populate(self):
         # calculate the num of shares currently owned
         self.df["Owned"] = self.df["Quantity"].cumsum()
         # calculate the invested balance
         self.df["Invested Balance"] = self.df["Purchase Price"] * self.df["Quantity"]
         self.df["Invested Balance"] = self.df["Invested Balance"].cumsum()
-        self.df["Realized Profit/Loss"] = -(self.df["Quantity"] * self.df["Purchase Price"]).\
+        self.df["Realized Profit/Loss"] = -(self.df["Quantity"] * self.df["Purchase Price"]). \
             where(self.df["Quantity"] < 0)
         self.df["Realized Profit/Loss"] = self.df["Realized Profit/Loss"].cumsum()
         # Making sure we have the same index as the historical series of stock prices
@@ -168,18 +169,19 @@ class Position(Stock):
         # --------------------------------------------------- #
         self.df['Current Value'] = self.df['Owned'] * self.prices
         self.df['Profit/Loss'] = self.df['Current Value'] - self.df["Invested Balance"]
-        self.df['Profit/Loss (%)'] = ((self.df["Realized Profit/Loss"] + self.df['Current Value'])/
-                                      (self.df["Realized Profit/Loss"] + self.df["Invested Balance"])- 1) * 100
+        self.df['Profit/Loss (%)'] = ((self.df["Realized Profit/Loss"] + self.df['Current Value']) /
+                                      (self.df["Realized Profit/Loss"] + self.df["Invested Balance"]) - 1) * 100
         # Reindexing over the full year with all the days to take into account for market closed days
         start_date = self.df.index.min()
         end_date = self.df.index.max()
         period = pd.date_range(start_date, end_date)
-        self.df  = self.df.reindex(period, method='ffill')
-
+        # sometimes it seems that Yahoo Finance returns duplicated rows... deduplicating here
+        self.df = self.df[~self.df.index.duplicated(keep='first')]
+        self.df = self.df.reindex(period, method='ffill')
 
     def plot_value(self):
         # Plotting the money value against the invested balance
-        labels = {'title':'%s Position Value' % self.ticker,
+        labels = {'title': '%s Position Value' % self.ticker,
                   'xaxis': 'Date',
                   'yaxis': 'USD'}
         self.plot_this(self.df[['Current Value', 'Invested Balance', 'Profit/Loss']], labels)
@@ -195,7 +197,7 @@ class Position(Stock):
     def __repr__(self):
         return "Position(%s)" % self.ticker
 
-        
+
 class Portfolio:
     def __init__(self, positions):
         self.positions = positions
@@ -207,7 +209,7 @@ class Portfolio:
 
     def __repr__(self):
         return "Portfolio(%.2f USD)" % self.current_value
-        
+
     def _populate(self):
         for p in self.positions.keys():
             if not self.df.empty:
@@ -232,7 +234,7 @@ class Portfolio:
             row = math.ceil(c / cols)
             col = cols if c % cols == 0 else c % cols
             pos = self.positions[p]
-            fig.add_trace(go.Scatter(x=pos.df.index, y=pos.df['Profit/Loss (%)'],name=pos.ticker),
+            fig.add_trace(go.Scatter(x=pos.df.index, y=pos.df['Profit/Loss (%)'], name=pos.ticker),
                           row=row, col=col)
             fig.update_yaxes(title_text="%", row=row, col=col)
             c += 1
@@ -245,15 +247,15 @@ class Portfolio:
         index = self.load_benchmark(benchmark)
         index._rebase_profits_from(p1.index.min())
         idx = index.df["Profit/Loss (%)"]
-        t = pd.concat((p1, idx.rename(index.ticker)), axis=1 )
-        labels = {'title':'Portfolio Profit/Loss (%)',
+        t = pd.concat((p1, idx.rename(index.ticker)), axis=1)
+        labels = {'title': 'Portfolio Profit/Loss (%)',
                   'xaxis': 'Date',
                   'yaxis': '%'}
         Stock.plot_this(t, labels)
 
     def plot_value(self):
         # Plotting the money value against the invested balance
-        labels = {'title':'Portfolio Value',
+        labels = {'title': 'Portfolio Value',
                   'xaxis': 'Date',
                   'yaxis': 'USD'}
         Stock.plot_this(self.df[['Current Value', 'Invested Balance', 'Profit/Loss']], labels)
@@ -266,9 +268,6 @@ class Portfolio:
         # TODO: This takes a new intended allocation and gives the best option to reach it
         # new is a list of tuples, exactly like self.allocation
         pass
-
-
-
 
     def _get_positions_size(self):
         sizes = []
@@ -285,10 +284,10 @@ class Portfolio:
         # Prints end of month portfolio report
         end = self.df.index.max()
         today = self.df.index.min()
+        print("\nMonthly Report\n____________________")
         while today < end - MonthEnd(1):
             today = today + MonthEnd(1)
             print(today.date(), "%.2f" % self.df.loc[today]["Profit/Loss (%)"])
-
 
 
 class Cache:
@@ -309,7 +308,7 @@ class Cache:
             self.data = pd.read_pickle(self.cache_file)
             self.found = True
         else:
-            self.data = pd.Series([],dtype='float64')
+            self.data = pd.Series([], dtype='float64')
         return self.data
 
     def end_date(self):
@@ -323,9 +322,27 @@ class Cache:
         return self.data.index[0]
 
 
-
-def main():
-    positions = YahooCsv("/Users/stemosco/Downloads/quotes_2.csv").load()
+def main(infile):
+    print("loading %s" % infile)
+    positions = YahooCsv(infile).load()
     portfolio = Portfolio(positions)
-    portfolio.plot_value()
+    portfolio.plot_profit_loss("^IXIC")
+    portfolio.monthly_report()
+    portfolio.plot_all_positions()
 
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='''Loads a CSV containing the export of your Yahoo Finance portfolio
+    [get it here for instance: https://finance.yahoo.com/portfolio/p_0/view] and plots profit/loss graphs for it''')
+
+    parser.add_argument('input_file', metavar='FILEPATH', type=str,
+                        help='The CSV of the exported portfolio')
+
+    arguments = parser.parse_args()
+    return arguments
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    infile = args.input_file
+    main(infile)
