@@ -18,8 +18,22 @@ TinyPortfolioTracker is a small set of libraries that lets you track your portfo
 
 It retrieves Yahoo!Finance data using `pandas-datareader` and tries to keep things small and simple offering a pythonic interface to interacting with your portfolio.
 
-## Usage
+## Basic Usage
 
+If you don't have special needs:
+1) clone the git repo
+2) install dependencies
+3) download the CSV of your portfolio
+4) and run the script.
+
+```commandline
+git clone https://github.com/stezz/tinyportfoliotracker.git
+cd tinyportfoliotracker
+pipenv shell
+pipenv install
+python yportfolio.py your_csv_file
+```
+## Advanced Usage
 Import the needed classes from `yportfolio` module and load your positions from the CSV file you exported:
 ```python
 from yportfolio import YahooCsv, Position, Portfolio
