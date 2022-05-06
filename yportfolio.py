@@ -206,6 +206,7 @@ class Portfolio:
         self.tickers = [self.positions[x].ticker for x in self.positions.keys()]
         self.current_value = round(self.df['Current Value'].iloc[-1], 2)
         self.allocation = self._get_positions_size()
+        self.position_values = self._get_positions_values()
 
     def __repr__(self):
         return "Portfolio(%.2f USD)" % self.current_value
@@ -280,6 +281,14 @@ class Portfolio:
         sizes.sort(key=lambda x: x[1], reverse=True)
         return sizes
 
+    def _get_positions_values(self):
+        values = []
+        for p in self.positions.keys():
+            share = round(self.positions[p].current_value / self.current_value * 100, 2)
+            values.append((self.positions[p].ticker, self.positions[p].current_value))
+        values.sort(key=lambda x: x[1], reverse=True)
+        return values
+
     def monthly_report(self):
         # Prints end of month portfolio report
         end = self.df.index.max()
@@ -329,6 +338,10 @@ def main(infile):
     portfolio.plot_profit_loss("^IXIC")
     portfolio.monthly_report()
     portfolio.plot_all_positions()
+    for x in portfolio.allocation:
+        print(x)
+    for x in portfolio.position_values:
+        print(x)
 
 
 def parse_arguments():
