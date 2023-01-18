@@ -1,5 +1,6 @@
 import pandas as pd
-import pandas_datareader as web
+from pandas_datareader import data as pdr
+import yfinance as yf
 import datetime as dt
 import numpy as np
 import plotly.graph_objects as go
@@ -8,6 +9,8 @@ from pandas.tseries.offsets import MonthEnd
 from plotly.subplots import make_subplots
 import math
 import argparse
+
+
 
 pd.options.plotting.backend = "plotly"
 
@@ -51,14 +54,18 @@ class Stock:
     def _load_prices(self, start_date):
         # Check first if we already have some historical prices saved in cache
         # start_date needs to be a datetime
+        yf.pdr_override()
         cache = Cache(self.ticker + ".pkl")
         cached_prices = cache.load()
         if cache.found and cache.start_date() < start_date:
             start_date = cache.end_date() + dt.timedelta(days=1)
         new_data = False
-        if dt.datetime.today() > start_date:
+        today = dt.datetime.today()
+        print(today, start_date)
+        if today > start_date:
             # Let's avoid making calls to Yahoo if not needed
-            new_prices = web.DataReader(self.ticker, "yahoo", start=start_date)["Adj Close"]
+            new_prices = pdr.get_data_yahoo([self.ticker], start=start_date)["Adj Close"]
+            new_prices.index = new_prices.index.tz_localize(None)
             new_data = True
         if cache.found and cache.start_date() < start_date and new_data:
             prices = pd.concat([cached_prices, new_prices])
@@ -338,10 +345,13 @@ def main(infile):
     portfolio.plot_profit_loss("^IXIC")
     portfolio.monthly_report()
     portfolio.plot_all_positions()
+    portfolio.plot_value()
+    print('Allocations')
     for x in portfolio.allocation:
-        print(x)
+        print(x[0],', ', x[1])
+    print('Position values')
     for x in portfolio.position_values:
-        print(x)
+        print(x[0], ', ', x[1])
 
 
 def parse_arguments():
